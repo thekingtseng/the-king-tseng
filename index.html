@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STEM KING TSENG AI - 御用膚況戰略 Web App</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+    
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        :root {
+            --gold: #D4AF37; --dark-blue: #0A192F; --light-gold: #F1E5AC;
+            --white: #FFFFFF; --alert-red: #FF4C4C; --safe-green: #00FF7F;
+            --card-bg: #112240; --text-gray: #A8B2D1;
+        }
+        body {
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--dark-blue); color: var(--white);
+            margin: 0; padding: 0; width: 100vw; overflow-x: hidden;
+        }
+        
+        /* 頂部導航與標題 */
+        .app-header {
+            background: rgba(10, 25, 47, 0.95); border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+            padding: 15px 10px; position: sticky; top: 0; z-index: 100; text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        h1 { color: var(--gold); letter-spacing: 1px; margin: 0 0 5px 0; font-size: 1.4em; text-transform: uppercase; }
+        h2 { color: var(--light-gold); margin: 0 0 10px 0; font-weight: normal; font-size: 11px; }
+
+        .ig-promo {
+            display: inline-block; padding: 6px 12px; background: rgba(212, 175, 55, 0.1);
+            border: 1px dashed var(--gold); border-radius: 20px; text-decoration: none;
+            color: var(--text-gray); font-size: 0.8em; transition: 0.3s;
+        }
+
+        /* 視圖切換區 */
+        .view-section { display: none; padding: 15px; padding-bottom: 80px; max-width: 900px; margin: 0 auto; animation: fadeIn 0.3s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 卡片與按鈕 */
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid rgba(212,175,55,0.3); margin-bottom: 15px; }
+        .upload-section {
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
+            padding: 20px; background: rgba(0,0,0,0.3); border: 1px dashed var(--gold); border-radius: 8px; margin-bottom: 15px;
+        }
+        .custom-file-upload {
+            border: 1px solid var(--gold); padding: 12px 20px; border-radius: 6px; color: var(--gold); font-weight: bold;
+            background: rgba(212, 175, 55, 0.1); width: 100%; text-align: center; cursor: pointer;
+        }
+        #imagePreview { max-width: 100%; max-height: 250px; border-radius: 8px; display: none; border: 2px solid var(--gold); margin-top: 10px; }
+        
+        .privacy-section {
+            display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px;
+            padding: 12px; background: rgba(212, 175, 55, 0.05); border-radius: 6px; border-left: 3px solid var(--gold);
+        }
+        .privacy-section input { width: 18px; height: 18px; margin-top: 4px; accent-color: var(--gold); }
+
+        .btn-analyze {
+            width: 100%; padding: 15px; background: linear-gradient(45deg, var(--gold), #B8860B);
+            color: var(--dark-blue); border: none; border-radius: 8px; font-weight: bold; font-size: 1.1em;
+            cursor: pointer; box-shadow: 0 4px 15px rgba(212,175,55,0.3);
+        }
+        .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 儀表板 */
+        .dashboard { display: none; flex-direction: column; gap: 15px; }
+        .stat-container { display: flex; justify-content: space-between; gap: 10px; }
+        .stat-item { flex: 1; text-align: center; background: rgba(0,0,0,0.3); padding: 15px 5px; border-radius: 8px; }
+        .stat-number { font-size: 1.5em; font-weight: bold; color: var(--gold); }
+        .kw-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin: 0 10px; }
+        .kw-bar-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width 1s; }
+        .chart-wrapper { height: 300px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; }
+
+        /* 底部導航 */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 65px;
+            background: rgba(10, 25, 47, 0.95); border-top: 1px solid rgba(212, 175, 55, 0.3);
+            display: flex; z-index: 1000; backdrop-filter: blur(10px);
+        }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-gray); font-size: 0.8em; }
+        .nav-item.active { color: var(--gold); border-top: 2px solid var(--gold); }
+
+        .loading-text { text-align: center; color: var(--gold); animation: pulse 1.5s infinite; padding: 20px; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        .disclaimer-box { margin-top: 20px; padding: 15px; background: rgba(255, 76, 76, 0.05); border: 1px solid rgba(255, 76, 76, 0.3); border-radius: 8px; font-size: 0.75em; color: #888; }
+    </style>
+</head>
+<body>
+
+    <div class="app-header">
+        <h1>STEM KING TSENG AI</h1>
+        <h2>在新偉大川普黃金年代，量化肌膚戰略</h2>
+        <a href="https://www.instagram.com/thekingtseng/" target="_blank" class="ig-promo" id="topIgLink">
+            🔔 追蹤官方 IG <strong>@thekingtseng</strong> 接收通知
+        </a>
+    </div>
+
+    <div id="view-analysis" class="view-section active">
+        <div class="upload-section">
+            <label for="imageInput" class="custom-file-upload">📸 啟動視覺掃描</label>
+            <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)">
+            <img id="imagePreview">
+        </div>
+
+        <div class="privacy-section">
+            <input type="checkbox" id="privacyConsent" onchange="checkReadiness()">
+            <label for="privacyConsent" class="privacy-text" style="font-size: 11px; color: #888;">
+                我同意影像僅供單次即時運算。本系統非醫療器材，結果僅供保養參考。
+            </label>
+        </div>
+        
+        <button id="analyzeBtn" class="btn-analyze" onclick="performAnalysis()" disabled>請先上傳照片與授權</button>
+
+        <div id="results" class="dashboard">
+            <div class="stat-container">
+                <div class="stat-item"><div style="font-size: 0.8em;">綜合膚況評分</div><div id="skinScore" class="stat-number">-</div></div>
+                <div class="stat-item"><div style="font-size: 0.8em;">優先觀測重點</div><div id="mainIssue" class="stat-number">-</div></div>
+            </div>
+            <div class="card"><div id="keywordBars"></div></div>
+            <div class="card"><div class="chart-wrapper"><canvas id="bubbleChart"></canvas></div></div>
+            <div class="card"><div id="aiCommentary" class="commentary" style="font-size: 0.9em;">等待指令...</div></div>
+            <button id="exportBtn" style="display:none; width:100%; padding:12px; background:#2E8B57; color:white; border:none; border-radius:8px;" onclick="exportPDF()">📥 匯出戰略報表</button>
+        </div>
+        
+        <div class="disclaimer-box">⚠️ 醫療免責：本系統結果不構成專業醫療建議，嚴重問題請立即就醫。</div>
+    </div>
+
+    <div id="view-manual" class="view-section">
+        <div class="card">
+            <h3 style="color:var(--gold);">⚖️ 法律合規與操作說明</h3>
+            <p style="font-size:0.85em;">本系統採用<b>最小化資料蒐集原則</b>，影像運算後即銷毀。嚴格遵守《化粧品衛生安全管理法》，不涉及醫療行為。</p>
+            <hr style="border:0.5px solid #333;">
+            <p style="font-size:0.85em;">✔️ 無疾病診斷 ✔️ 無藥物處方 ✔️ 僅供保養建議</p>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchView('analysis', this)"><div>👁️‍🗨️</div><div>AI 觀測</div></div>
+        <div class="nav-item" onclick="switchView('manual', this)"><div>⚖️</div><div>合規手冊</div></div>
+    </div>
+
+<script>
+    let myBubbleChart = null, base64Image = "", mimeType = "";
+
+    function switchView(v, e) {
+        document.querySelectorAll('.view-section, .nav-item').forEach(el => el.classList.remove('active'));
+        document.getElementById('view-' + v).classList.add('active'); e.classList.add('active');
+    }
+
+    function checkReadiness() {
+        const btn = document.getElementById('analyzeBtn');
+        btn.disabled = !(base64Image && document.getElementById('privacyConsent').checked);
+        if(!btn.disabled) btn.innerText = "執行 御用 LLM 膚況觀測";
+    }
+
+    function previewImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+                const max = 800; let w = img.width, h = img.height;
+                if(w > h) { if(w > max){ h *= max/w; w = max; } } else { if(h > max){ w *= max/h; h = max; } }
+                canvas.width = w; canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                base64Image = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+                document.getElementById('imagePreview').src = canvas.toDataURL('image/jpeg');
+                document.getElementById('imagePreview').style.display = 'block';
+                checkReadiness();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function performAnalysis() {
+        const btn = document.getElementById('analyzeBtn');
+        const apiKey = "AIzaSyBmt4lNMzyUDGWCFg74MYDnzuuegyeIxSo"; // 若失效請確認最新的 Key
+        btn.disabled = true; btn.innerText = "視覺引擎運算中...";
+        document.getElementById('results').style.display = 'flex';
+        document.getElementById('aiCommentary').innerHTML = "<div class='loading-text'>新偉大川普黃金年代 AI 正在解碼...</div>";
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [
+                        { text: "你是「STEM KING TSENG AI」，僅使用美容詞彙。請分析照片並輸出 JSON: {skinScore:0-100, mainIssue:'6字內', metrics:[{name:'名', pct:0-100, x:0-100, y:-50-50, cat:'分類'}], commentary:'100字內王者評語'}。避開醫療診斷。" },
+                        { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                    ]}]
+                })
+            });
+
+            if(!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            const data = await response.json();
+            const res = JSON.parse(data.candidates[0].content.parts[0].text.replace(/```json|```/g, ""));
+
+            document.getElementById('skinScore').innerText = res.skinScore;
+            document.getElementById('mainIssue').innerText = res.mainIssue;
+            document.getElementById('aiCommentary').innerHTML = `<b>👑 王者評語：</b>${res.commentary}`;
+            document.getElementById('keywordBars').innerHTML = res.metrics.map(m => `
+                <div style="display:flex; align-items:center; margin-bottom:8px; font-size:12px;">
+                    <span style="width:70px;">${m.name}</span>
+                    <div class="kw-bar-bg"><div class="kw-bar-fill" style="width:${m.pct}%"></div></div>
+                    <span>${m.pct}</span>
+                </div>`).join('');
+            drawChart(res.metrics);
+            document.getElementById('exportBtn').style.display = 'block';
+        } catch (e) {
+            document.getElementById('aiCommentary').innerHTML = `<span style="color:var(--alert-red);">🚨 運算中斷：${e.message}。請確認網路或 API 權限。</span>`;
+        } finally { btn.disabled = false; btn.innerText = "重新執行戰略觀測"; }
+    }
+
+    function drawChart(m) {
+        const ctx = document.getElementById('bubbleChart').getContext('2d');
+        if(myBubbleChart) myBubbleChart.destroy();
+        myBubbleChart = new Chart(ctx, {
+            type: 'bubble', data: { datasets: m.map(kw => ({
+                label: kw.name, data: [{ x: kw.x, y: kw.y, r: kw.pct/5 + 5 }],
+                backgroundColor: 'rgba(212,175,55,0.7)'
+            }))},
+            options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{
+                x:{min:0, max:100, grid:{color:'#333'}}, y:{min:-50, max:50, grid:{color:'#333'}}
+            }}
+        });
+    }
+
+    function exportPDF() {
+        const opt = { margin:10, filename:'STEM_KING_戰略報表.pdf', html2canvas:{scale:2}, jsPDF:{unit:'mm', format:'a4'} };
+        html2pdf().set(opt).from(document.getElementById('results')).save();
+    }
+</script>
+</body>
+</html>
